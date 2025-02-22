@@ -1,0 +1,32 @@
+# postgres/docker-compose.yaml
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-strongpassword123}
+      POSTGRES_DB: ${POSTGRES_DB:-mydb}
+      POSTGRES_HOST_AUTH_METHOD: scram-sha-256
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgresql.conf:/etc/postgresql/postgresql.conf
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf
+    networks:
+      - backend
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.postgres.rule=Host(`postgres.kratuwus.co`)"
+      - "traefik.http.services.postgres.loadbalancer.server.port=5432"
+      - "traefik.http.routers.postgres.middlewares=ip-whitelist@file,postgres-auth,rate-limit"
+    restart: unless-stopped
+
+networks:
+  backend:
+    name: backend
+    external: true
+
+volumes:
+  postgres_data:

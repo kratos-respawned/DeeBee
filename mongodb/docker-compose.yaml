@@ -1,0 +1,29 @@
+# mongodb/docker-compose.yaml
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:6
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-strongpassword123}
+    volumes:
+      - mongodb_data:/data/db
+      - ./mongod.conf:/etc/mongod.conf
+    command: mongod --config /etc/mongod.conf
+    networks:
+      - backend
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.mongodb.rule=Host(`mongodb.kratuwus.co`)"
+      - "traefik.http.services.mongodb.loadbalancer.server.port=27017"
+      - "traefik.http.routers.mongodb.middlewares=ip-whitelist@file,mongodb-auth,rate-limit"
+    restart: unless-stopped
+
+networks:
+  backend:
+    name: backend
+    external: true
+
+volumes:
+  mongodb_data:

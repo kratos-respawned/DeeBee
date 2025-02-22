@@ -1,0 +1,28 @@
+# redis/docker-compose.yaml
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    command: redis-server /usr/local/etc/redis/redis.conf
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-strongpassword123}
+    volumes:
+      - redis_data:/data
+      - ./redis.conf:/usr/local/etc/redis/redis.conf
+    networks:
+      - backend
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.redis.rule=Host(`redis.kratuwus.co`)"
+      - "traefik.http.services.redis.loadbalancer.server.port=6379"
+      - "traefik.http.routers.redis.middlewares=ip-whitelist@file,redis-auth,rate-limit"
+    restart: unless-stopped
+
+networks:
+  backend:
+    name: backend
+    external: true
+
+volumes:
+  redis_data:

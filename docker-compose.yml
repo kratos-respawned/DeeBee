@@ -1,0 +1,84 @@
+# docker-compose.yaml (root directory)
+version: '3.8'
+
+services:
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared
+    command: tunnel run
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
+    restart: unless-stopped
+    networks:
+      - backend
+
+  traefik:
+    image: traefik:v2.10
+    profiles: ["core"]
+    command:
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--accesslog=true"
+      - "--accesslog.filepath=/var/log/traefik/access.log"
+      - "--api.dashboard=true"
+      - "--api.insecure=false"
+      - "--providers.file.directory=/etc/traefik/dynamic"
+      - "--providers.file.watch=true"
+    environment:
+      - ALLOWED_IP_RANGES=${ALLOWED_IP_RANGES:-""}
+    expose:
+      - "80"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik:/etc/traefik
+      - traefik_logs:/var/log/traefik
+    networks:
+      - backend
+    restart: unless-stopped
+
+  config-generator:
+    image: busybox
+    profiles: ["core"]
+    volumes:
+      - ./traefik:/etc/traefik
+    command: >
+      sh -c '
+      mkdir -p /etc/traefik/dynamic &&
+      while true; do
+        if [ -n "$$ALLOWED_IP_RANGES" ]; then
+          echo "Creating config with IP restrictions..." &&
+          echo "http:" > /etc/traefik/dynamic/config.yaml &&
+          echo "  middlewares:" >> /etc/traefik/dynamic/config.yaml &&
+          echo "    ip-whitelist:" >> /etc/traefik/dynamic/config.yaml &&
+          echo "      ipWhiteList:" >> /etc/traefik/dynamic/config.yaml &&
+          echo "        sourceRange:" >> /etc/traefik/dynamic/config.yaml &&
+          echo "$$ALLOWED_IP_RANGES" | tr "," "\n" | while read -r range; do
+            echo "          - \"$$range\"" >> /etc/traefik/dynamic/config.yaml
+          done
+        else
+          echo "Creating config without IP restrictions..." &&
+          echo "http:" > /etc/traefik/dynamic/config.yaml &&
+          echo "  middlewares:" >> /etc/traefik/dynamic/config.yaml &&
+          echo "    ip-whitelist:" >> /etc/traefik/dynamic/config.yaml &&
+          echo "      ipWhiteList:" >> /etc/traefik/dynamic/config.yaml &&
+          echo "        sourceRange:" >> /etc/traefik/dynamic/config.yaml &&
+          echo "          - \"0.0.0.0/0\"" >> /etc/traefik/dynamic/config.yaml
+        fi
+        sleep 60
+      done'
+    environment:
+      - ALLOWED_IP_RANGES=${ALLOWED_IP_RANGES:-""}
+    restart: unless-stopped
+
+networks:
+  backend:
+    driver: bridge
+    internal: true
+
+volumes:
+  traefik_logs:
+
+
+
+
