@@ -1,17 +1,6 @@
-# docker-compose.yaml (root directory)
 version: '3.8'
 
 services:
-  cloudflared:
-    image: cloudflare/cloudflared:latest
-    container_name: cloudflared
-    command: tunnel run
-    environment:
-      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
-    restart: unless-stopped
-    networks:
-      - backend
-
   traefik:
     image: traefik:v2.10
     profiles: ["core"]
@@ -78,7 +67,3 @@ networks:
 
 volumes:
   traefik_logs:
-
-
-
-
